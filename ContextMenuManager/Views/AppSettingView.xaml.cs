@@ -27,6 +27,7 @@ namespace ContextMenuManager.Views
 
             LoadLabels();
 
+            ThemeComboBox.SelectedIndex = AppConfig.AppTheme;
             ConfigDirComboBox.SelectedIndex = AppConfig.SaveToAppDir ? 1 : 0;
             UpdateComboBox.SelectedIndex = GetUpdateSelectIndex();
             RepoComboBox.SelectedIndex = AppConfig.RequestUseGithub ? 0 : 1;
@@ -62,6 +63,11 @@ namespace ContextMenuManager.Views
 
         private void LoadDynamicOptions()
         {
+            ThemeComboBox.Items.Clear();
+            ThemeComboBox.Items.Add(AppString.Other.ThemeSystem);
+            ThemeComboBox.Items.Add(AppString.Other.ThemeLight);
+            ThemeComboBox.Items.Add(AppString.Other.ThemeDark);
+
             ConfigDirComboBox.Items.Clear();
             ConfigDirComboBox.Items.Add(AppString.Other.AppDataDir);
             ConfigDirComboBox.Items.Add(AppString.Other.AppDir);
@@ -89,6 +95,7 @@ namespace ContextMenuManager.Views
             OpenConfigDirButton.Content = AppString.Menu.FileLocation ?? "Open";
 
             UpdateFrequencyLabel.Text = AppString.Other.SetUpdateFrequency;
+            ThemeLabel.Text = AppString.Other.AppTheme;
             CheckUpdateButton.Content = AppString.About.CheckUpdate ?? "Check Update";
 
             RepoLabel.Text = AppString.Other.SetRequestRepo;
@@ -135,6 +142,13 @@ namespace ContextMenuManager.Views
         private void CheckUpdateButton_OnClick(object sender, RoutedEventArgs e)
         {
             Updater.Update(true);
+        }
+
+        private void ThemeComboBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (isLoading || ThemeComboBox.SelectedIndex < 0) return;
+            AppConfig.AppTheme = ThemeComboBox.SelectedIndex;
+            App.UpdateApplicationTheme();
         }
 
         private void ConfigDirComboBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)

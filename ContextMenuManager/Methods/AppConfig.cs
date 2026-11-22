@@ -380,6 +380,13 @@ namespace ContextMenuManager.Methods
             set => SetGeneralValue("RequestUseGithub", value ? 1 : 0);
         }
 
+        /// <summary>テーマ（0: システムに合わせる、1: ライト、2: ダーク）</summary>
+        public static int AppTheme
+        {
+            get => int.TryParse(GetGeneralValue("AppTheme"), out var v) && v is >= 0 and <= 2 ? v : 0;
+            set => SetGeneralValue("AppTheme", value);
+        }
+
         public static int UpdateFrequency
         {
             get
