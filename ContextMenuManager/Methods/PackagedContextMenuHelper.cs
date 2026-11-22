@@ -28,6 +28,8 @@ namespace ContextMenuManager.Methods
             public string VerbId { get; init; } = string.Empty;
             /// <summary>実際に右クリックメニューに表示される名前（IExplorerCommand.GetTitle で取得）</summary>
             public string Title { get; set; } = string.Empty;
+            /// <summary>この項目を実装している DLL のフルパス（分かる場合）</summary>
+            public string DllPath { get; init; } = string.Empty;
             /// <summary>マニフェストの ItemType（"*"、"Directory"、"Directory\Background"、".docx" など）</summary>
             public List<string> ItemTypes { get; } = new();
         }
@@ -127,7 +129,7 @@ namespace ContextMenuManager.Methods
 
         #region 実際の表示名の取得
 
-        private static string TitleCachePath => Path.Combine(AppConfig.ConfigDir, "PackagedMenuTitles.v2.txt");
+        private static string TitleCachePath => Path.Combine(AppConfig.ConfigDir, "PackagedMenuTitles.v3.txt");
 
         /// <summary>表示名の取得ログ（うまく取れないときの調査用）</summary>
         public static string TitleLogPath => Path.Combine(AppConfig.ConfigDir, "PackagedMenuTitles.log");
@@ -139,7 +141,7 @@ namespace ContextMenuManager.Methods
         private static void ResolveTitles(List<Entry> entries)
         {
             var cache = LoadTitleCache();
-            var requests = new List<(Guid Guid, string ItemPath)>();
+            var requests = new List<(Guid Guid, string ItemPath, string DllPath)>();
             foreach (var entry in entries)
             {
                 if (cache.TryGetValue(CacheKey(entry), out var cached))
@@ -148,7 +150,7 @@ namespace ContextMenuManager.Methods
                 }
                 else
                 {
-                    requests.Add((entry.Guid, GetProbeItemPath(entry)));
+                    requests.Add((entry.Guid, GetProbeItemPath(entry), entry.DllPath));
                 }
             }
             if (requests.Count == 0) return;
@@ -286,12 +288,50 @@ namespace ContextMenuManager.Methods
                             PublisherDisplayName = publisherName,
                             IdentityName = identityName,
                             VerbId = verbXE.GetAttribute("Id"),
+                            DllPath = FindDllPath(fullName, guid, Path.GetDirectoryName(manifestPath)),
                         };
                         result.Add(guid, entry);
                     }
                     if (!entry.ItemTypes.Contains(type, StringComparer.OrdinalIgnoreCase)) entry.ItemTypes.Add(type);
                 }
             }
+        }
+
+        /// <summary>
+        /// HKCR\PackagedCom\Package\[パッケージ]\Class\[CLSID] の DllPath から、DLL のフルパスを求める。
+        /// DllPath はパッケージのフォルダー（スパースパッケージでは外部の場所）からの相対パス。
+        /// </summary>
+        private static string FindDllPath(string fullName, Guid guid, string manifestDir)
+        {
+            try
+            {
+                using var classKey = Registry.ClassesRoot.OpenSubKey($@"{PackagedComPath}\{fullName}\Class\{guid:B}");
+                var dll = classKey?.GetValue("DllPath")?.ToString();
+                if (string.IsNullOrEmpty(dll)) return string.Empty;
+                dll = Environment.ExpandEnvironmentVariables(dll);
+                if (Path.IsPathRooted(dll)) return File.Exists(dll) ? dll : string.Empty;
+
+                var bases = new List<string>();
+                using (var repoKey = Registry.ClassesRoot.OpenSubKey($@"{PackageRepositoryPath}\{fullName}"))
+                {
+                    foreach (var name in new[] { "Path", "PackageRootFolder", "ExternalLocation", "EffectiveLocation" })
+                    {
+                        var v = repoKey?.GetValue(name)?.ToString();
+                        if (!string.IsNullOrEmpty(v)) bases.Add(v);
+                    }
+                }
+                if (!string.IsNullOrEmpty(manifestDir)) bases.Add(manifestDir);
+                bases.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "WindowsApps", fullName));
+                foreach (var b in bases)
+                {
+                    var candidate = Path.Combine(b, dll);
+                    if (File.Exists(candidate)) return candidate;
+                }
+            }
+            catch
+            {
+            }
+            return string.Empty;
         }
 
         /// <summary>パッケージの AppxManifest.xml の場所を探す。</summary>

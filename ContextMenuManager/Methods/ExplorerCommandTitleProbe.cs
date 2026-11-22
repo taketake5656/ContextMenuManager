@@ -25,7 +25,7 @@ namespace ContextMenuManager.Methods
         /// 指定した CLSID の表示名を子プロセスで取得する。取得できなかったものは結果に含まれない。
         /// </summary>
         /// <param name="requests">CLSID と、GetTitle に渡す対象（ファイルやフォルダー）のパス</param>
-        public static Dictionary<Guid, string> Query(IReadOnlyList<(Guid Guid, string ItemPath)> requests, string logPath = null)
+        public static Dictionary<Guid, string> Query(IReadOnlyList<(Guid Guid, string ItemPath, string DllPath)> requests, string logPath = null)
         {
             var result = new Dictionary<Guid, string>();
             if (requests.Count == 0) return result;
@@ -37,7 +37,10 @@ namespace ContextMenuManager.Methods
             {
                 Directory.CreateDirectory(workDir);
                 var sb = new StringBuilder();
-                foreach (var (guid, itemPath) in requests) sb.Append(guid.ToString("B")).Append('\t').Append(itemPath ?? string.Empty).Append('\n');
+                foreach (var (guid, itemPath, dllPath) in requests)
+                {
+                    sb.Append(guid.ToString("B")).Append('\t').Append(itemPath ?? string.Empty).Append('\t').Append(dllPath ?? string.Empty).Append('\n');
+                }
                 File.WriteAllText(inFile, sb.ToString(), Encoding.UTF8);
                 if (File.Exists(outFile)) File.Delete(outFile);
 
@@ -126,11 +129,13 @@ namespace ContextMenuManager.Methods
                 var parts = line.Split('\t');
                 if (parts.Length < 1 || !Guid.TryParse(parts[0], out var guid)) continue;
                 var itemPath = parts.Length > 1 ? parts[1] : null;
+                var dllPath = parts.Length > 2 ? parts[2] : null;
                 string title = null;
                 Log($"{guid:B} 対象: {itemPath}");
+                Log($"  DLL: {(string.IsNullOrEmpty(dllPath) ? "（不明）" : dllPath)}");
                 try
                 {
-                    title = GetTitle(guid, itemPath);
+                    title = GetTitle(guid, itemPath, dllPath);
                 }
                 catch (Exception ex)
                 {
@@ -149,12 +154,17 @@ namespace ContextMenuManager.Methods
             }
         }
 
-        private static string GetTitle(Guid clsid, string itemPath)
+        private static string GetTitle(Guid clsid, string itemPath, string dllPath)
         {
             var iid = typeof(IExplorerCommand).GUID;
             var hr = CoCreateInstance(ref clsid, IntPtr.Zero, CLSCTX_INPROC_SERVER | CLSCTX_LOCAL_SERVER, ref iid, out var obj);
             Log($"  CoCreateInstance: 0x{hr:X8}");
-            if (hr < 0 || obj == null) return null;
+            if (hr < 0 || obj == null)
+            {
+                // パッケージの COM クラスはパッケージ外から CoCreateInstance できないため、DLL を直接読み込んで作る
+                obj = CreateFromDll(clsid, dllPath);
+            }
+            if (obj == null) return null;
             var command = (IExplorerCommand)obj;
             IntPtr itemArray = IntPtr.Zero;
             try
@@ -201,6 +211,49 @@ namespace ContextMenuManager.Methods
             }
         }
 
+        private static object CreateFromDll(Guid clsid, string dllPath)
+        {
+            if (string.IsNullOrEmpty(dllPath) || !File.Exists(dllPath)) return null;
+            var module = LoadLibraryEx(dllPath, IntPtr.Zero, LOAD_WITH_ALTERED_SEARCH_PATH);
+            if (module == IntPtr.Zero)
+            {
+                Log($"  LoadLibrary: 失敗（エラー {Marshal.GetLastWin32Error()}）");
+                return null;
+            }
+            var proc = GetProcAddress(module, "DllGetClassObject");
+            if (proc == IntPtr.Zero)
+            {
+                Log("  DllGetClassObject: 見つからない");
+                return null;
+            }
+            var getClassObject = Marshal.GetDelegateForFunctionPointer<DllGetClassObjectFn>(proc);
+            var iidFactory = typeof(IClassFactory).GUID;
+            var hr = getClassObject(ref clsid, ref iidFactory, out var pFactory);
+            Log($"  DllGetClassObject: 0x{hr:X8}");
+            if (hr < 0 || pFactory == IntPtr.Zero) return null;
+            try
+            {
+                var factory = (IClassFactory)Marshal.GetObjectForIUnknown(pFactory);
+                var iid = typeof(IExplorerCommand).GUID;
+                hr = factory.CreateInstance(IntPtr.Zero, ref iid, out var pCommand);
+                Log($"  CreateInstance: 0x{hr:X8}");
+                if (hr < 0 || pCommand == IntPtr.Zero) return null;
+                try
+                {
+                    return Marshal.GetObjectForIUnknown(pCommand);
+                }
+                finally
+                {
+                    Marshal.Release(pCommand);
+                }
+            }
+            finally
+            {
+                Marshal.Release(pFactory);
+            }
+            // DLL は子プロセスの終了まで解放しない（解放すると実装側でクラッシュすることがある）
+        }
+
         private static IntPtr CreateItemArray(string path)
         {
             if (string.IsNullOrEmpty(path)) return IntPtr.Zero;
@@ -221,6 +274,25 @@ namespace ContextMenuManager.Methods
         private const uint CLSCTX_INPROC_SERVER = 0x1;
         private const uint CLSCTX_LOCAL_SERVER = 0x4;
         private const uint COINIT_APARTMENTTHREADED = 0x2;
+        private const uint LOAD_WITH_ALTERED_SEARCH_PATH = 0x8;
+
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate int DllGetClassObjectFn(ref Guid rclsid, ref Guid riid, out IntPtr ppv);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern IntPtr LoadLibraryEx(string lpLibFileName, IntPtr hFile, uint dwFlags);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Ansi, ExactSpelling = true)]
+        private static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
+
+        [ComImport]
+        [Guid("00000001-0000-0000-C000-000000000046")]
+        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IClassFactory
+        {
+            [PreserveSig] int CreateInstance(IntPtr pUnkOuter, ref Guid riid, out IntPtr ppvObject);
+            [PreserveSig] int LockServer(int fLock);
+        }
 
         [DllImport("ole32.dll")]
         private static extern int CoInitializeEx(IntPtr pvReserved, uint dwCoInit);
