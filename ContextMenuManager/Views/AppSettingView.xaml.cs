@@ -312,7 +312,7 @@ namespace ContextMenuManager.Views
             if (!isLoading)
             {
                 AppConfig.DetectPackagedMenus = DetectPackagedMenusCheckBox.IsOn;
-                PackagedContextMenuHelper.Reload();
+                PackagedContextMenuHelper.ClearTitleCache();
             }
         }
 

@@ -26,6 +26,8 @@ namespace ContextMenuManager.Methods
             public string PublisherDisplayName { get; init; } = string.Empty;
             public string IdentityName { get; init; } = string.Empty;
             public string VerbId { get; init; } = string.Empty;
+            /// <summary>実際に右クリックメニューに表示される名前（IExplorerCommand.GetTitle で取得）</summary>
+            public string Title { get; set; } = string.Empty;
             /// <summary>マニフェストの ItemType（"*"、"Directory"、"Directory\Background"、".docx" など）</summary>
             public List<string> ItemTypes { get; } = new();
         }
@@ -112,8 +114,126 @@ namespace ContextMenuManager.Methods
             catch
             {
             }
-            return result.Values.ToList();
+            var entries = result.Values.ToList();
+            try
+            {
+                ResolveTitles(entries);
+            }
+            catch
+            {
+            }
+            return entries;
         }
+
+        #region 実際の表示名の取得
+
+        private static string TitleCachePath => Path.Combine(AppConfig.ConfigDir, "PackagedMenuTitles.txt");
+
+        /// <summary>
+        /// 実際の右クリックメニューの表示名を取得する。
+        /// 結果はパッケージのフルネーム（バージョンを含む）ごとに保存し、アプリが更新されたときだけ取り直す。
+        /// </summary>
+        private static void ResolveTitles(List<Entry> entries)
+        {
+            var cache = LoadTitleCache();
+            var requests = new List<(Guid Guid, string ItemPath)>();
+            foreach (var entry in entries)
+            {
+                if (cache.TryGetValue(CacheKey(entry), out var cached))
+                {
+                    entry.Title = cached;
+                }
+                else
+                {
+                    requests.Add((entry.Guid, GetProbeItemPath(entry)));
+                }
+            }
+            if (requests.Count == 0) return;
+
+            var titles = ExplorerCommandTitleProbe.Query(requests);
+            foreach (var entry in entries)
+            {
+                var key = CacheKey(entry);
+                if (cache.ContainsKey(key)) continue;
+                entry.Title = titles.TryGetValue(entry.Guid, out var title) ? title : string.Empty;
+                // 取得できなかった場合も空で保存し、毎回の起動で取り直さないようにする
+                cache[key] = entry.Title;
+            }
+            SaveTitleCache(cache, entries);
+        }
+
+        /// <summary>保存済みの表示名を破棄する（次回の検出で取り直す）。</summary>
+        public static void ClearTitleCache()
+        {
+            try { File.Delete(TitleCachePath); } catch { }
+            Reload();
+        }
+
+        private static string CacheKey(Entry entry) => $"{entry.PackageFullName}|{entry.Guid:B}";
+
+        private static Dictionary<string, string> LoadTitleCache()
+        {
+            var cache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                if (!File.Exists(TitleCachePath)) return cache;
+                foreach (var line in File.ReadAllLines(TitleCachePath, System.Text.Encoding.UTF8))
+                {
+                    var i = line.IndexOf('\t');
+                    if (i <= 0) continue;
+                    cache[line[..i]] = line[(i + 1)..];
+                }
+            }
+            catch
+            {
+            }
+            return cache;
+        }
+
+        private static void SaveTitleCache(Dictionary<string, string> cache, List<Entry> entries)
+        {
+            try
+            {
+                // 現在インストールされているパッケージの分だけ残す（古いバージョンの分は捨てる）
+                var keys = new HashSet<string>(entries.Select(CacheKey), StringComparer.OrdinalIgnoreCase);
+                var lines = cache.Where(kv => keys.Contains(kv.Key)).Select(kv => $"{kv.Key}\t{kv.Value}");
+                File.WriteAllLines(TitleCachePath, lines, new System.Text.UTF8Encoding(true));
+            }
+            catch
+            {
+            }
+        }
+
+        /// <summary>GetTitle に渡す「選択中の項目」として使うファイルやフォルダーを用意する。</summary>
+        private static string GetProbeItemPath(Entry entry)
+        {
+            try
+            {
+                var dir = Path.Combine(Path.GetTempPath(), "ContextMenuManager_probe");
+                Directory.CreateDirectory(dir);
+                var type = entry.ItemTypes.FirstOrDefault(t => t == "*")
+                    ?? entry.ItemTypes.FirstOrDefault(t => t.StartsWith("."))
+                    ?? entry.ItemTypes.FirstOrDefault() ?? "*";
+                if (type == "*" || type.StartsWith("."))
+                {
+                    var ext = type == "*" ? ".txt" : type;
+                    var file = Path.Combine(dir, "probe" + ext);
+                    if (!File.Exists(file)) File.WriteAllBytes(file, Array.Empty<byte>());
+                    return file;
+                }
+                if (Eq(type, "Drive")) return Path.GetPathRoot(Environment.SystemDirectory);
+                // Directory、Directory\Background、Folder など
+                var folder = Path.Combine(dir, "probe_folder");
+                Directory.CreateDirectory(folder);
+                return folder;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        #endregion
 
         private static void ScanPackage(string fullName, Dictionary<Guid, Entry> result)
         {
@@ -234,7 +354,9 @@ namespace ContextMenuManager.Methods
         /// <summary>一覧に表示する名前を作る。</summary>
         public static string GetItemText(Entry entry)
         {
-            var text = GuidInfo.GetText(entry.Guid);
+            // 実際の右クリックメニューの表示名が取れていれば、それを最優先で使う
+            var text = entry.Title;
+            if (string.IsNullOrWhiteSpace(text)) text = GuidInfo.GetText(entry.Guid);
             if (string.IsNullOrWhiteSpace(text))
             {
                 text = entry.DisplayName;
