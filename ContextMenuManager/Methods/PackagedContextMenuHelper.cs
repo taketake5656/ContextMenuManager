@@ -238,20 +238,28 @@ namespace ContextMenuManager.Methods
             if (string.IsNullOrWhiteSpace(text))
             {
                 text = entry.DisplayName;
-                // 「ShellEx Package」のような汎用的な表示名では、どのアプリの項目か分からないため発行元などを前に付ける
-                if (IsGenericName(text))
-                {
-                    var owner = !string.IsNullOrWhiteSpace(entry.PublisherDisplayName)
-                        ? entry.PublisherDisplayName
-                        : entry.IdentityName.Split('.')[0];
-                    if (!string.IsNullOrWhiteSpace(owner) && text.IndexOf(owner, StringComparison.OrdinalIgnoreCase) < 0)
-                    {
-                        text = $"{owner} - {text}";
-                    }
-                }
                 if (!string.IsNullOrWhiteSpace(entry.VerbId) && !Eq(entry.VerbId, entry.DisplayName))
                 {
                     text += $" ({entry.VerbId})";
+                }
+                // 「ShellEx Package」のような汎用的な表示名では、どのアプリの項目か分からないため
+                // 発行元を前に、パッケージ名を後ろに付ける
+                if (IsGenericName(entry.DisplayName))
+                {
+                    var packageName = string.IsNullOrWhiteSpace(entry.IdentityName)
+                        ? entry.PackageFullName.Split('_')[0]
+                        : entry.IdentityName;
+                    var publisher = entry.PublisherDisplayName;
+                    if (!string.IsNullOrWhiteSpace(publisher)
+                        && text.IndexOf(publisher, StringComparison.OrdinalIgnoreCase) < 0
+                        && packageName.IndexOf(publisher, StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        text = $"{publisher} - {text}";
+                    }
+                    if (!string.IsNullOrWhiteSpace(packageName) && !Eq(packageName, entry.DisplayName))
+                    {
+                        text += $" - {packageName}";
+                    }
                 }
             }
             var exts = entry.ItemTypes.Where(t => t.StartsWith(".")).ToList();
