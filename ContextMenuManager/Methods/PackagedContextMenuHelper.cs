@@ -23,6 +23,8 @@ namespace ContextMenuManager.Methods
             public Guid Guid { get; init; }
             public string PackageFullName { get; init; } = string.Empty;
             public string DisplayName { get; init; } = string.Empty;
+            public string PublisherDisplayName { get; init; } = string.Empty;
+            public string IdentityName { get; init; } = string.Empty;
             public string VerbId { get; init; } = string.Empty;
             /// <summary>マニフェストの ItemType（"*"、"Directory"、"Directory\Background"、".docx" など）</summary>
             public List<string> ItemTypes { get; } = new();
@@ -130,6 +132,9 @@ namespace ContextMenuManager.Methods
             var identityName = (doc.SelectSingleNode("/*[local-name()='Package']/*[local-name()='Identity']") as XmlElement)?.GetAttribute("Name") ?? string.Empty;
             var displayName = ResolveDisplayName(fullName, identityName,
                 doc.SelectSingleNode("/*[local-name()='Package']/*[local-name()='Properties']/*[local-name()='DisplayName']")?.InnerText);
+            var publisherRaw = doc.SelectSingleNode("/*[local-name()='Package']/*[local-name()='Properties']/*[local-name()='PublisherDisplayName']")?.InnerText;
+            var publisherName = string.IsNullOrWhiteSpace(publisherRaw) ? string.Empty : ResolveDisplayName(fullName, identityName, publisherRaw);
+            if (publisherName == (string.IsNullOrEmpty(identityName) ? fullName.Split('_')[0] : identityName)) publisherName = string.Empty;
 
             foreach (XmlElement itemTypeXE in itemTypeNodes)
             {
@@ -145,6 +150,8 @@ namespace ContextMenuManager.Methods
                             Guid = guid,
                             PackageFullName = fullName,
                             DisplayName = displayName,
+                            PublisherDisplayName = publisherName,
+                            IdentityName = identityName,
                             VerbId = verbXE.GetAttribute("Id"),
                         };
                         result.Add(guid, entry);
@@ -212,6 +219,18 @@ namespace ContextMenuManager.Methods
             return fallback;
         }
 
+        private static readonly string[] GenericNameWords =
+        {
+            "ShellEx", "Shell Ex", "Shell Extension", "ShellExtension", "Package", "Sparse", "Context Menu", "ContextMenu", "Explorer Command",
+        };
+
+        /// <summary>アプリ名として役に立たない汎用的な表示名か</summary>
+        private static bool IsGenericName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return true;
+            return GenericNameWords.Any(w => name.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
         /// <summary>一覧に表示する名前を作る。</summary>
         public static string GetItemText(Entry entry)
         {
@@ -219,6 +238,17 @@ namespace ContextMenuManager.Methods
             if (string.IsNullOrWhiteSpace(text))
             {
                 text = entry.DisplayName;
+                // 「ShellEx Package」のような汎用的な表示名では、どのアプリの項目か分からないため発行元などを前に付ける
+                if (IsGenericName(text))
+                {
+                    var owner = !string.IsNullOrWhiteSpace(entry.PublisherDisplayName)
+                        ? entry.PublisherDisplayName
+                        : entry.IdentityName.Split('.')[0];
+                    if (!string.IsNullOrWhiteSpace(owner) && text.IndexOf(owner, StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        text = $"{owner} - {text}";
+                    }
+                }
                 if (!string.IsNullOrWhiteSpace(entry.VerbId) && !Eq(entry.VerbId, entry.DisplayName))
                 {
                     text += $" ({entry.VerbId})";
