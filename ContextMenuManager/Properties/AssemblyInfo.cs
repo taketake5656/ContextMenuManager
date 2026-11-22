@@ -1,11 +1,11 @@
 ﻿using System.Reflection;
 using System.Runtime.InteropServices;
 
-[assembly: AssemblyTitle("右键菜单管理器")]
-[assembly: AssemblyDescription("右键菜单管理器")]
+[assembly: AssemblyTitle("右クリックメニュー管理")]
+[assembly: AssemblyDescription("Windows 右クリックメニュー管理")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("蓝点lilac Jack251970")]
-[assembly: AssemblyProduct("右键菜单管理器")]
+[assembly: AssemblyProduct("右クリックメニュー管理")]
 [assembly: AssemblyCopyright("Copyright @ 2020-2026 蓝点lilac Jack251970")]
 [assembly: AssemblyTrademark("蓝点lilac Jack25197")]
 [assembly: AssemblyCulture("")]

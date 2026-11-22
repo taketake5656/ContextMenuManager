@@ -21,6 +21,8 @@ namespace ContextMenuManager
             // 启动WPF应用
             if (SingleInstance<App>.InitializeAsFirstInstance())
             {
+                // 埋め込みの最新の言語ファイルと辞書を設定フォルダーに反映
+                AppConfig.SyncBundledFiles();
                 // 初始化字符串、更新检查和XML字典
                 AppString.LoadStrings();
                 XmlDicHelper.ReloadDics();
@@ -36,6 +38,7 @@ namespace ContextMenuManager
         {
             try
             {
+                AppConfig.SyncBundledFiles();
                 AppString.LoadStrings();
 
                 var filePath = AppConfig.LogonRestoreFilePath;
