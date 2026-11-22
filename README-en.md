@@ -1,4 +1,4 @@
-**[简体中文](README.md)** | **English**
+**[日本語](README.md)** | **[简体中文](README-zh-CN.md)** | **English**
 
 <div align="center">
     <img width="700" src="./Logo/Logo-en.png"></img>

@@ -390,6 +390,7 @@ namespace ContextMenuManager.Methods
             public static string HideSysStoreItems { get; set; }
             public static string StripMenuMnemonics { get; set; }
             public static string DimInferredIcons { get; set; }
+            public static string DetectPackagedMenus { get; set; }
             public static string SetPerceivedType { get; set; }
             public static string SetDefaultDropEffect { get; set; }
             public static string TopMost { get; set; }

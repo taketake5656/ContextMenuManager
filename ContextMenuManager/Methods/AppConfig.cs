@@ -26,11 +26,11 @@ namespace ContextMenuManager.Methods
 
         public const string GithubLatest = "https://github.com/Jack251970/ContextMenuManager/releases/latest";
         public const string GithubLatestApi = "https://api.github.com/repos/Jack251970/ContextMenuManager/releases/latest";
-        public const string GithubLangsApi = "https://api.github.com/repos/Jack251970/ContextMenuManager/contents/languages";
-        public const string GithubLangsRawDir = "https://raw.githubusercontent.com/Jack251970/ContextMenuManager/master/languages";
-        public const string GithubShellNewApi = "https://api.github.com/repos/Jack251970/ContextMenuManager/contents/ContextMenuManager/Properties/Resources/ShellNew";
-        public const string GithubShellNewRawDir = "https://raw.githubusercontent.com/Jack251970/ContextMenuManager/master/ContextMenuManager/Properties/Resources/ShellNew";
-        public const string GithubTexts = "https://raw.githubusercontent.com/Jack251970/ContextMenuManager/master/ContextMenuManager/Properties/Resources/Texts";
+        public const string GithubLangsApi = "https://api.github.com/repos/taketake5656/ContextMenuManager/contents/languages";
+        public const string GithubLangsRawDir = "https://raw.githubusercontent.com/taketake5656/ContextMenuManager/master/languages";
+        public const string GithubShellNewApi = "https://api.github.com/repos/taketake5656/ContextMenuManager/contents/ContextMenuManager/Properties/Resources/ShellNew";
+        public const string GithubShellNewRawDir = "https://raw.githubusercontent.com/taketake5656/ContextMenuManager/master/ContextMenuManager/Properties/Resources/ShellNew";
+        public const string GithubTexts = "https://raw.githubusercontent.com/taketake5656/ContextMenuManager/master/ContextMenuManager/Properties/Resources/Texts";
         public const string GithubDonateRaw = "https://raw.githubusercontent.com/Jack251970/ContextMenuManager/master/Donate.md";
         public const string GithubDonate = "https://github.com/Jack251970/ContextMenuManager/blob/master/Donate.md";
 
@@ -199,6 +199,47 @@ namespace ContextMenuManager.Methods
 
         public static string LanguageIniPath { get; private set; }
 
+        /// <summary>アプリに埋め込んでいる言語ファイル</summary>
+        private static readonly string[] BundledLanguages =
+        {
+            "ar-DZ", "de-DE", "en-US", "ja-JP", "ko-KR", "pt-BR", "ru-RU", "tr-TR", "zh-CN", "zh-TW",
+        };
+
+        /// <summary>
+        /// アプリに埋め込んだ最新の言語ファイルと辞書を、設定フォルダー（Languages、Dictionaries\Web）へ反映する。
+        /// 以前のバージョンや本家から取得した古いファイルが残っていると、新しい訳が使われないため。
+        /// </summary>
+        public static void SyncBundledFiles()
+        {
+            static void WriteIfChanged(string path, string content, System.Text.Encoding encoding)
+            {
+                try
+                {
+                    if (string.IsNullOrEmpty(content)) return;
+                    if (File.Exists(path) && File.ReadAllText(path) == content) return;
+                    Directory.CreateDirectory(Path.GetDirectoryName(path));
+                    File.WriteAllText(path, content, encoding);
+                }
+                catch
+                {
+                    // 書き込めなくても起動は続ける
+                }
+            }
+
+            var utf8Bom = new System.Text.UTF8Encoding(true);
+            foreach (var name in BundledLanguages)
+            {
+                WriteIfChanged($@"{LangsDir}\{name}.ini", Properties.AppResources.GetBundledLanguage(name), utf8Bom);
+            }
+            WriteIfChanged(WebGuidInfosDic, Properties.AppResources.GuidInfosDic, System.Text.Encoding.Unicode);
+            WriteIfChanged(WebEnhanceMenusDic, Properties.AppResources.EnhanceMenusDic, System.Text.Encoding.Unicode);
+            WriteIfChanged(WebDetailedEditDic, Properties.AppResources.DetailedEditDic, System.Text.Encoding.Unicode);
+            WriteIfChanged(WebUwpModeItemsDic, Properties.AppResources.UwpModeItemsDic, System.Text.Encoding.Unicode);
+
+            // 言語ファイルが新しく置かれた場合に備えて、言語の判定をやり直す
+            LoadLanguage();
+        }
+
         private static string language;
         public static string Language
         {
@@ -318,6 +359,13 @@ namespace ContextMenuManager.Methods
         {
             get => GetGeneralValue("DimInferredIcons") != "0";
             set => SetGeneralValue("DimInferredIcons", value ? 1 : 0);
+        }
+
+        /// <summary>パッケージアプリ（Windows 11 の新しいメニュー）の項目を自動検出するか（既定: 有効）</summary>
+        public static bool DetectPackagedMenus
+        {
+            get => GetGeneralValue("DetectPackagedMenus") != "0";
+            set => SetGeneralValue("DetectPackagedMenus", value ? 1 : 0);
         }
 
         public static bool RequestUseGithub

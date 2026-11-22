@@ -1,4 +1,4 @@
-using ContextMenuManager.Methods;
+﻿using ContextMenuManager.Methods;
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
@@ -425,6 +425,36 @@ namespace ContextMenuManager.Controls
                         }
                     }
                 }
+            }
+            LoadPackagedContextMenuItems();
+        }
+
+        /// <summary>
+        /// 辞書に載っていない、パッケージアプリ（Windows 11 の新しいメニュー）の項目を
+        /// AppxManifest から自動検出して追加する。
+        /// </summary>
+        private void LoadPackagedContextMenuItems()
+        {
+            if (!AppConfig.DetectPackagedMenus) return;
+            IEnumerable<PackagedContextMenuHelper.Entry> entries;
+            try
+            {
+                entries = PackagedContextMenuHelper.GetEntries(Scene, CurrentExtension).ToList();
+            }
+            catch
+            {
+                return;
+            }
+            foreach (var entry in entries)
+            {
+                var isAdded = false;
+                foreach (var ctr in Controls)
+                {
+                    if (ctr.Item is UwpModeItem item && item.Guid == entry.Guid) { isAdded = true; break; }
+                }
+                if (isAdded) continue;
+                var uwpItem = new UwpModeItem(this, entry.PackageFullName, entry.Guid, PackagedContextMenuHelper.GetItemText(entry));
+                AddItem(uwpItem);
             }
         }
 

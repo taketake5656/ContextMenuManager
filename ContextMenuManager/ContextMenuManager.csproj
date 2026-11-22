@@ -46,6 +46,8 @@
   <ItemGroup>
     <Content Include="Properties\AppIcon.ico" />
     <Resource Include="Properties\Resources\**\*.*" />
+    <!-- 言語ファイルをアプリに埋め込み、起動時に Config\Languages へ展開する（Release ビルドでも最新の訳を使うため） -->
+    <Resource Include="..\languages\*.ini" Link="Properties\Resources\Languages\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

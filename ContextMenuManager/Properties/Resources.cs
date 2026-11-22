@@ -96,5 +96,8 @@ namespace ContextMenuManager.Properties
         public static string DetailedEditDic => GetText("pack://application:,,,/ContextMenuManager;component/Properties/Resources/Texts/DetailedEditDic.xml");
         public static string EnhanceMenusDic => GetText("pack://application:,,,/ContextMenuManager;component/Properties/Resources/Texts/EnhanceMenusDic.xml");
         public static string UwpModeItemsDic => GetText("pack://application:,,,/ContextMenuManager;component/Properties/Resources/Texts/UwpModeItemsDic.xml");
+
+        /// <summary>アプリに埋め込んだ言語ファイル（languages\*.ini）の内容。無ければ空文字列。</summary>
+        public static string GetBundledLanguage(string name) => GetText($"pack://application:,,,/ContextMenuManager;component/Properties/Resources/Languages/{name}.ini");
     }
 }

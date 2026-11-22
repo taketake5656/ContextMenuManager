@@ -15,10 +15,11 @@ namespace ContextMenuManager.Controls
             set => Control.ContextMenu = value;
         }
 
-        public UwpModeItem(MyList list, string uwpName, Guid guid) : base(list)
+        public UwpModeItem(MyList list, string uwpName, Guid guid, string customText = null) : base(list)
         {
             Guid = guid;
             UwpName = uwpName;
+            CustomText = customText;
             Text = ResourceString.StripMnemonics(ItemText);
             if (list != null)
             {
@@ -60,7 +61,10 @@ namespace ContextMenuManager.Controls
             }
         }
 
-        public string ItemText => GuidInfo.GetText(Guid);
+        /// <summary>辞書に無い自動検出項目の表示名</summary>
+        public string CustomText { get; }
+
+        public string ItemText => string.IsNullOrWhiteSpace(CustomText) ? GuidInfo.GetText(Guid) : CustomText;
         public string RegPath => UwpHelper.GetRegPath(UwpName, Guid);
         public string ItemFilePath => UwpHelper.GetFilePath(UwpName, Guid);
 

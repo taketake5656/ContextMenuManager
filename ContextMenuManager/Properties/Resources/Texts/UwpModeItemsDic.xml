@@ -1,9 +1,10 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<!-- 微软在Win10右键菜单中新增的UWP模块, 非Shell、ShellEx类型,
-但是可通过GUID锁定屏蔽来禁用相关右键菜单项目,
-GUID查找位置：HKEY_CLASSES_ROOT\PackagedCom\Package\[包名]\Class\[GUID],
-Scene的各子节点为菜单项目出现位置, Item必须有Guid属性，
-UwpName、Text、Icon、Tip等属性写在GuidInfosDic.ini里面-->
+<!-- Microsoft が Win10 の右クリックメニューに追加した UWP モジュールです。Shell、ShellEx 型ではありませんが、
+GUID ブロックで該当する右クリックメニュー項目を無効にできます。
+GUID の場所: HKEY_CLASSES_ROOT\PackagedCom\Package\[パッケージ名]\Class\[GUID]
+Scene の各子ノードはメニュー項目が表示される場所で、Item には Guid 属性が必要です。
+UwpName、Text、Icon、Tip などの属性は GuidInfosDic.ini に書きます。
+※ このフォークでは、ここに無い項目も AppxManifest から自動検出して表示します。-->
 
 <Scene>
   <File>
