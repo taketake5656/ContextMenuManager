@@ -55,9 +55,15 @@ namespace ContextMenuManager
             }
         }
 
-        private static void UpdateApplicationTheme()
+        /// <summary>設定（システムに合わせる／ライト／ダーク）に従ってテーマを適用する。</summary>
+        public static void UpdateApplicationTheme()
         {
-            var isDarkMode = IsSystemDarkModeEnabled();
+            var isDarkMode = AppConfig.AppTheme switch
+            {
+                1 => false,
+                2 => true,
+                _ => IsSystemDarkModeEnabled(),
+            };
             ThemeManager.Current.ApplicationTheme = isDarkMode ? ApplicationTheme.Dark : ApplicationTheme.Light;
         }
 
