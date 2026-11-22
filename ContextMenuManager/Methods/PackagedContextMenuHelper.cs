@@ -25,6 +25,8 @@ namespace ContextMenuManager.Methods
             public string DisplayName { get; init; } = string.Empty;
             public string PublisherDisplayName { get; init; } = string.Empty;
             public string IdentityName { get; init; } = string.Empty;
+            /// <summary>PackagedCom の Server に登録されたアプリ名（リソースから解決したもの）</summary>
+            public string ServerDisplayName { get; init; } = string.Empty;
             public string VerbId { get; init; } = string.Empty;
             /// <summary>マニフェストの ItemType（"*"、"Directory"、"Directory\Background"、".docx" など）</summary>
             public List<string> ItemTypes { get; } = new();
@@ -136,6 +138,8 @@ namespace ContextMenuManager.Methods
             var publisherName = string.IsNullOrWhiteSpace(publisherRaw) ? string.Empty : ResolveDisplayName(fullName, identityName, publisherRaw);
             if (publisherName == (string.IsNullOrEmpty(identityName) ? fullName.Split('_')[0] : identityName)) publisherName = string.Empty;
 
+            var serverDisplayName = GetServerDisplayName(fullName);
+
             foreach (XmlElement itemTypeXE in itemTypeNodes)
             {
                 var type = itemTypeXE.GetAttribute("Type");
@@ -152,6 +156,7 @@ namespace ContextMenuManager.Methods
                             DisplayName = displayName,
                             PublisherDisplayName = publisherName,
                             IdentityName = identityName,
+                            ServerDisplayName = serverDisplayName,
                             VerbId = verbXE.GetAttribute("Id"),
                         };
                         result.Add(guid, entry);
@@ -159,6 +164,35 @@ namespace ContextMenuManager.Methods
                     if (!entry.ItemTypes.Contains(type, StringComparer.OrdinalIgnoreCase)) entry.ItemTypes.Add(type);
                 }
             }
+        }
+
+        /// <summary>
+        /// HKCR\PackagedCom\Package\[パッケージ]\Server\* の ApplicationDisplayName / DisplayName を解決する。
+        /// マニフェストの表示名が「ShellEx Package」のように汎用的でも、ここには正しいアプリ名が入っていることがある
+        /// （リソースマップ名がパッケージ名と異なる場合も、登録された間接文字列ならそのまま解決できる）。
+        /// </summary>
+        private static string GetServerDisplayName(string fullName)
+        {
+            try
+            {
+                using var serverKey = Registry.ClassesRoot.OpenSubKey($@"{PackagedComPath}\{fullName}\Server");
+                if (serverKey == null) return string.Empty;
+                foreach (var name in serverKey.GetSubKeyNames())
+                {
+                    using var key = serverKey.OpenSubKey(name);
+                    foreach (var valueName in new[] { "ApplicationDisplayName", "DisplayName" })
+                    {
+                        var raw = key?.GetValue(valueName)?.ToString();
+                        if (string.IsNullOrWhiteSpace(raw)) continue;
+                        var text = raw.StartsWith("@") ? ResourceString.GetDirectString(raw) : raw;
+                        if (!string.IsNullOrWhiteSpace(text) && !IsGenericName(text)) return text.Trim();
+                    }
+                }
+            }
+            catch
+            {
+            }
+            return string.Empty;
         }
 
         /// <summary>パッケージの AppxManifest.xml の場所を探す。</summary>
@@ -237,20 +271,24 @@ namespace ContextMenuManager.Methods
             var text = GuidInfo.GetText(entry.Guid);
             if (string.IsNullOrWhiteSpace(text))
             {
-                text = entry.DisplayName;
-                if (!string.IsNullOrWhiteSpace(entry.VerbId) && !Eq(entry.VerbId, entry.DisplayName))
+                // マニフェストの表示名が汎用的なら、PackagedCom に登録されたアプリ名を使う
+                var appName = IsGenericName(entry.DisplayName) && !string.IsNullOrWhiteSpace(entry.ServerDisplayName)
+                    ? entry.ServerDisplayName
+                    : entry.DisplayName;
+                text = appName;
+                if (!string.IsNullOrWhiteSpace(entry.VerbId) && !Eq(entry.VerbId, appName))
                 {
                     text += $" ({entry.VerbId})";
                 }
                 // 「ShellEx Package」のような汎用的な表示名では、どのアプリの項目か分からないため
                 // 発行元を前に、パッケージ名を後ろに付ける
-                if (IsGenericName(entry.DisplayName))
+                if (IsGenericName(appName))
                 {
                     var packageName = string.IsNullOrWhiteSpace(entry.IdentityName)
                         ? entry.PackageFullName.Split('_')[0]
                         : entry.IdentityName;
                     var publisher = entry.PublisherDisplayName;
-                    if (!string.IsNullOrWhiteSpace(publisher)
+                    if (!string.IsNullOrWhiteSpace(publisher) && !IsGenericName(publisher)
                         && text.IndexOf(publisher, StringComparison.OrdinalIgnoreCase) < 0
                         && packageName.IndexOf(publisher, StringComparison.OrdinalIgnoreCase) < 0)
                     {
