@@ -25,7 +25,7 @@ namespace ContextMenuManager.Methods
         /// 指定した CLSID の表示名を子プロセスで取得する。取得できなかったものは結果に含まれない。
         /// </summary>
         /// <param name="requests">CLSID と、GetTitle に渡す対象（ファイルやフォルダー）のパス</param>
-        public static Dictionary<Guid, string> Query(IReadOnlyList<(Guid Guid, string ItemPath)> requests)
+        public static Dictionary<Guid, string> Query(IReadOnlyList<(Guid Guid, string ItemPath)> requests, string logPath = null)
         {
             var result = new Dictionary<Guid, string>();
             if (requests.Count == 0) return result;
@@ -51,11 +51,21 @@ namespace ContextMenuManager.Methods
                 psi.ArgumentList.Add(ProbeArg);
                 psi.ArgumentList.Add(inFile);
                 psi.ArgumentList.Add(outFile);
+                if (!string.IsNullOrEmpty(logPath))
+                {
+                    try { File.WriteAllText(logPath, $"# {DateTime.Now:yyyy-MM-dd HH:mm:ss} 表示名の取得ログ\n", Encoding.UTF8); } catch { }
+                    psi.ArgumentList.Add(logPath);
+                }
                 using (var process = Process.Start(psi))
                 {
                     if (process != null && !process.WaitForExit(TimeoutMilliseconds))
                     {
                         try { process.Kill(true); } catch { }
+                        AppendLog(logPath, "タイムアウトしたため取得処理を打ち切りました");
+                    }
+                    else if (process != null && process.ExitCode != 0)
+                    {
+                        AppendLog(logPath, $"取得処理が異常終了しました（終了コード 0x{process.ExitCode:X8}）");
                     }
                 }
 
@@ -88,8 +98,19 @@ namespace ContextMenuManager.Methods
         #region 子プロセス側
 
         /// <summary>子プロセスのエントリーポイント。Program.Main から呼ばれる。</summary>
-        public static void RunProbe(string inFile, string outFile)
+        private static string logFile;
+
+        private static void AppendLog(string path, string message)
         {
+            if (string.IsNullOrEmpty(path)) return;
+            try { File.AppendAllText(path, message + "\n", Encoding.UTF8); } catch { }
+        }
+
+        private static void Log(string message) => AppendLog(logFile, message);
+
+        public static void RunProbe(string inFile, string outFile, string logPath = null)
+        {
+            logFile = logPath;
             string[] lines;
             try
             {
@@ -106,13 +127,16 @@ namespace ContextMenuManager.Methods
                 if (parts.Length < 1 || !Guid.TryParse(parts[0], out var guid)) continue;
                 var itemPath = parts.Length > 1 ? parts[1] : null;
                 string title = null;
+                Log($"{guid:B} 対象: {itemPath}");
                 try
                 {
                     title = GetTitle(guid, itemPath);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Log($"  例外: {ex.GetType().Name} 0x{ex.HResult:X8} {ex.Message}");
                 }
+                Log($"  結果: {(string.IsNullOrWhiteSpace(title) ? "（取得できず）" : title)}");
                 if (string.IsNullOrWhiteSpace(title)) continue;
                 title = title.Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ');
                 try
@@ -129,6 +153,7 @@ namespace ContextMenuManager.Methods
         {
             var iid = typeof(IExplorerCommand).GUID;
             var hr = CoCreateInstance(ref clsid, IntPtr.Zero, CLSCTX_INPROC_SERVER | CLSCTX_LOCAL_SERVER, ref iid, out var obj);
+            Log($"  CoCreateInstance: 0x{hr:X8}");
             if (hr < 0 || obj == null) return null;
             var command = (IExplorerCommand)obj;
             IntPtr itemArray = IntPtr.Zero;
@@ -136,6 +161,7 @@ namespace ContextMenuManager.Methods
             {
                 itemArray = CreateItemArray(itemPath);
                 // まず選択項目を渡して取得し、だめなら選択項目なしで取得する
+                Log($"  選択項目の作成: {(itemArray != IntPtr.Zero ? "成功" : "失敗")}");
                 var title = CallGetTitle(command, itemArray);
                 if (string.IsNullOrWhiteSpace(title) && itemArray != IntPtr.Zero) title = CallGetTitle(command, IntPtr.Zero);
                 return title;
@@ -153,6 +179,7 @@ namespace ContextMenuManager.Methods
             try
             {
                 var hr = command.GetTitle(itemArray, out pName);
+                Log($"  GetTitle（選択項目{(itemArray != IntPtr.Zero ? "あり" : "なし")}）: 0x{hr:X8}");
                 if (hr < 0 || pName == IntPtr.Zero) return null;
                 var title = Marshal.PtrToStringUni(pName);
                 // 「@{パッケージ?ms-resource://...}」のような間接文字列で返す実装もある
@@ -163,8 +190,9 @@ namespace ContextMenuManager.Methods
                 }
                 return title;
             }
-            catch
+            catch (Exception ex)
             {
+                Log($"  GetTitle 例外: {ex.GetType().Name} 0x{ex.HResult:X8}");
                 return null;
             }
             finally

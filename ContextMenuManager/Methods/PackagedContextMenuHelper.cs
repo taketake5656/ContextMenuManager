@@ -127,7 +127,10 @@ namespace ContextMenuManager.Methods
 
         #region 実際の表示名の取得
 
-        private static string TitleCachePath => Path.Combine(AppConfig.ConfigDir, "PackagedMenuTitles.txt");
+        private static string TitleCachePath => Path.Combine(AppConfig.ConfigDir, "PackagedMenuTitles.v2.txt");
+
+        /// <summary>表示名の取得ログ（うまく取れないときの調査用）</summary>
+        public static string TitleLogPath => Path.Combine(AppConfig.ConfigDir, "PackagedMenuTitles.log");
 
         /// <summary>
         /// 実際の右クリックメニューの表示名を取得する。
@@ -150,7 +153,7 @@ namespace ContextMenuManager.Methods
             }
             if (requests.Count == 0) return;
 
-            var titles = ExplorerCommandTitleProbe.Query(requests);
+            var titles = ExplorerCommandTitleProbe.Query(requests, TitleLogPath);
             foreach (var entry in entries)
             {
                 var key = CacheKey(entry);
@@ -160,6 +163,16 @@ namespace ContextMenuManager.Methods
                 cache[key] = entry.Title;
             }
             SaveTitleCache(cache, entries);
+            try
+            {
+                // ログの CLSID がどのアプリの項目か分かるように対応表を付ける
+                var map = entries.Where(e => requests.Any(r => r.Guid == e.Guid))
+                    .Select(e => $"{e.Guid:B} = {e.IdentityName} ({e.VerbId})");
+                File.AppendAllLines(TitleLogPath, new[] { "# CLSID とパッケージの対応" }.Concat(map), System.Text.Encoding.UTF8);
+            }
+            catch
+            {
+            }
         }
 
         /// <summary>保存済みの表示名を破棄する（次回の検出で取り直す）。</summary>
