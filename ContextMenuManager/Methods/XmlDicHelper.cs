@@ -132,6 +132,39 @@ namespace ContextMenuManager.Methods
             }
             if (culture.Equals(AppConfig.Language, StringComparison.OrdinalIgnoreCase)) return true;
             if (culture.Equals(CultureInfo.CurrentUICulture.Name, StringComparison.OrdinalIgnoreCase)) return true;
+            // 中国語以外の UI（日本語など）で、その言語の訳が無い表示用テキストは英語訳を使う
+            // （既定値は中国語のため、そのままだと日本語 UI に中国語が混ざってしまう）
+            if (culture.Equals("en-US", StringComparison.OrdinalIgnoreCase) && UseEnglishFallback
+                && FallbackNodeNames.Contains(itemXN.Name) && !HasCurrentCultureSibling(itemXN)) return true;
+            return false;
+        }
+
+        private static readonly HashSet<string> FallbackNodeNames = new(StringComparer.Ordinal) { "Text", "Tip", "REG_SZ" };
+
+        /// <summary>UI が中国語以外の言語ファイルで表示されているか（英語訳へのフォールバックを使うか）</summary>
+        public static bool UseEnglishFallback
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(AppConfig.LanguageIniPath)) return false; // 内蔵の中国語 UI
+                var lang = AppConfig.Language;
+                if (string.IsNullOrEmpty(lang)) lang = CultureInfo.CurrentUICulture.Name;
+                return !lang.StartsWith("zh", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        /// <summary>同じ名前の兄弟要素に、現在の言語向けの訳があるか</summary>
+        private static bool HasCurrentCultureSibling(XmlNode node)
+        {
+            if (node.ParentNode == null) return false;
+            foreach (XmlNode sibling in node.ParentNode.ChildNodes)
+            {
+                if (sibling == node || sibling.Name != node.Name) continue;
+                var c = sibling.SelectSingleNode("Culture")?.InnerText;
+                if (string.IsNullOrEmpty(c)) continue;
+                if (c.Equals(AppConfig.Language, StringComparison.OrdinalIgnoreCase)) return true;
+                if (c.Equals(CultureInfo.CurrentUICulture.Name, StringComparison.OrdinalIgnoreCase)) return true;
+            }
             return false;
         }
 

@@ -1,79 +1,83 @@
-**简体中文** | **[English](README-en.md)**
+**日本語** | **[简体中文](README-zh-CN.md)** | **[English](README-en.md)**
 
 <div align="center">
-    <img width="700" src="./Logo/Logo.png"></img>
+    <img width="700" src="./Logo/Logo-en.png"></img>
 </div>
 <h1 align="center">ContextMenuManager</h1>
-<h4 align="center">一个纯粹的Windows右键菜单管理器，支持 Windows 7 ~ 11</h4>
-
-<div align="center">
-
-![GitHub Release](https://img.shields.io/github/v/release/Jack251970/ContextMenuManager?label=版本)
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/Jack251970/ContextMenuManager/total?label=下载量)
-[![Stars](https://img.shields.io/github/stars/Jack251970/ContextMenuManager?style=flat&logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZlcnNpb249IjEiIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiI+PHBhdGggZD0iTTggLjI1YS43NS43NSAwIDAgMSAuNjczLjQxOGwxLjg4MiAzLjgxNSA0LjIxLjYxMmEuNzUuNzUgMCAwIDEgLjQxNiAxLjI3OWwtMy4wNDYgMi45Ny43MTkgNC4xOTJhLjc1MS43NTEgMCAwIDEtMS4wODguNzkxTDggMTIuMzQ3bC0zLjc2NiAxLjk4YS43NS43NSAwIDAgMS0xLjA4OC0uNzlsLjcyLTQuMTk0TC44MTggNi4zNzRhLjc1Ljc1IDAgMCAxIC40MTYtMS4yOGw0LjIxLS42MTFMNy4zMjcuNjY4QS43NS43NSAwIDAgMSA4IC4yNVoiIGZpbGw9IiNlYWM1NGYiLz48L3N2Zz4=&logoSize=auto&label=收藏)](https://github.com/Jack251970/ContextMenuManager/)
-![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/Jack251970/ContextMenuManager?label="问题")
-
-</div>
+<h4 align="center">Windows の右クリックメニューを管理するツール（Windows 7～11 対応）</h4>
 
 ---
 
-## 💕 特别感谢
-* 本项目基于 [https://github.com/BluePointLilac/ContextMenuManager](https://github.com/BluePointLilac/ContextMenuManager) 进行开发，感谢作者 [蓝点lilac](https://github.com/BluePointLilac)！
-* 感谢由 [澜芸](https://github.com/LanYun2022) 与 [KamilDev](https://github.com/KamilDev) 制作的的新图标！
+このリポジトリは [Jack251970/ContextMenuManager](https://github.com/Jack251970/ContextMenuManager) の個人用フォークです。
+本家に加えて、主に次の点を改善しています。
 
-## 🚀 程序下载
-* [最新版本][Latest]<br>
-  [GitHub Releases][GitHub Releases]<br>
-  [Gitee Releases][Gitee Releases]<br>
-* 下载说明：在Assets文件列表里面下载zip（建议）或者直接下载exe
-* .NET版本说明：程序基于.NET10，适用于Win11、10、8.1、8、7。对于Windows 7、8、8.1请下载3.6.2.2以及之前的版本，最新版本不再保证兼容性。<br>
-  如果您的设备不包含.NET10，则需要安装对应版本的[.NET SDK]
+## ✨ このフォークでの変更点
 
-## ⭐ 主要功能
-* 启用或禁用文件、文件夹、新建、发送到、打开方式、自定义文件格式、IE浏览器、WinX等右键菜单项目并对右键菜单进行备份和恢复
-* 对上述场景右键菜单项目进行修改名称、修改图标、导航注册表位置、导航文件位置、永久删除等操作
-* 对上述场景右键菜单自定义添加项目，自定义菜单命令
+### Windows 11 の新しいメニューの項目を自動検出
+Windows 11 の新しい右クリックメニューには、パッケージアプリ（MSIX やスパースパッケージ）が追加した項目が表示されます。
+「Copilot に質問」やセキュリティソフト（カスペルスキーなど）の項目がその例です。
 
-## 🖥️ 兼容性
-* 适用于 Windows 7、8、8.1、10、11
-* 适用于 64位、32位 的系统
-* 适用于高分屏，最佳显示缩放比为150%
-* 程序支持国际化多语言显示，欢迎为此程序制作语言字典
+本家では、これらの項目は**内蔵の辞書（UwpModeItemsDic.xml）に載っているものしか一覧に出ません**。
+このフォークでは、インストール済みパッケージの `AppxManifest.xml` に書かれた右クリックメニュー拡張（`FileExplorerContextMenus`）を読み取り、辞書に無い項目も自動で一覧に追加します。
 
-## 🖼️ 运行截图
+* 表示場所
+  * 「ファイル」：すべてのファイル向け（`*`）の項目と、特定の拡張子向け（`.docx` など）の項目。拡張子限定の項目は、名前のあとに `[.docx, .xlsx …]` のように対象の拡張子を表示します
+  * 「フォルダー」「ディレクトリ」：フォルダー向けの項目
+  * 「フォルダーの背景」「デスクトップの背景」：背景向けの項目
+  * 「拡張子を指定」：選んだ拡張子向けの項目
+* オン・オフの仕組み
+  * 本家の UWP モジュールと同じく、`Shell Extensions\Blocked` に CLSID を登録して非表示にします。アプリを更新しても元に戻りにくい方法です
+  * 変更を反映するには、エクスプローラーの再起動が必要です
+* 設定
+  * 「設定」→「Windows 11 の新しいメニューに出るアプリ（パッケージ）の項目を自動検出する」で、自動検出を無効にできます（既定は有効）
+
+### 日本語表示の改善
+* 日本語の言語ファイル（`languages/ja-JP.ini`）を全面的に見直しました。訳の抜けていた項目（バックアップと復元、検索など）も補っています
+* 辞書（拡張メニュー、詳細な編集、GUID 情報）に日本語訳が無い項目は、これまで中国語で表示されていました。このフォークでは、**英語訳があれば英語で表示**します
+
+## 🚀 ダウンロードとビルド
+* このフォークのビルドは、GitHub Actions の「build」ワークフローの成果物（Artifacts）からダウンロードできます
+* タグを付けてプッシュすると、「publish」ワークフローがリリースを作成します
+* .NET 10 で動作します。.NET 10 が入っていない場合は、[.NET デスクトップ ランタイム][.NET]をインストールしてください
+* 自分でビルドする場合は、Visual Studio 2026 などで `ContextMenuManager.sln` を開くか、次のコマンドを実行します
+
+```powershell
+dotnet build ContextMenuManager.sln --configuration Release
+```
+
+## ⭐ 主な機能
+* ファイル、フォルダー、新規作成、送る、プログラムから開く、指定した拡張子、IE、Win+X などの右クリックメニュー項目の有効・無効を切り替え、バックアップと復元ができます
+* 各項目の名前やアイコンの変更、レジストリやファイルの場所へのジャンプ、完全な削除ができます
+* 右クリックメニューに独自の項目やコマンドを追加できます
+
+## 🖥️ 動作環境
+* Windows 7、8、8.1、10、11（Windows 7、8、8.1 は本家の 3.6.2.2 以前を使用してください）
+* 64 ビット / 32 ビット OS
+* 高 DPI に対応（表示スケール 150% で最適）
+* 多言語表示に対応
+
+## 🖼️ スクリーンショット
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./Screenshot/Screenshot-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="./Screenshot/Screenshot.png">
-  <img alt="运行截图" src="./Screenshot/Screenshot.png">
+  <source media="(prefers-color-scheme: dark)" srcset="./Screenshot/Screenshot-en-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="./Screenshot/Screenshot-en.png">
+  <img alt="スクリーンショット" src="./Screenshot/Screenshot-en.png">
 </picture>
 
-## 🪧 温馨提示
-* 程序需要对大量的注册表项和文件进行读写删改操作，这些行为比较敏感，可能会被 Windows Defender 等误报为病毒，如发生此情况请自行添加进白名单。
+## 🪧 注意事項
+* 大量のレジストリやファイルを読み書きするため、Windows Defender などにウイルスと誤判定されることがあります。その場合は除外リストに追加してください。
+* 特殊なメニュー項目（シェル拡張、暗号化ファイルなど）の中には、他の要因で右クリックメニューに表示されないものがあります。その場合でも、このツールでは一般的な判定ルールに従って「有効」と表示されることがありますが、正常な動作です。
+* 右クリックメニュー管理ツールごとに無効化の方法は異なります。複数のツールを同時に使わないでください。
+* 多くのツールは「バックアップして削除」という単純な方法を使いますが、このツールはできるだけ OS が用意している値を使って非表示にし、あとで元に戻しやすくしています。
+* 他のツールで無効にした項目は、先にそのツールで元に戻してください。戻さないと、このツールでは表示されないことがあります。
+* このツールはアンインストールの残骸を掃除するためのものではありません。ただし、メニュー項目に関係するレジストリやファイルの場所をすばやく探す手助けにはなります。慣れていない場合は、有効・無効の切り替えだけを使うことをおすすめします。
 
-* 一些特殊菜单项（Shell 扩展、加密文件等）可能会受到其他因素影响导致不会直接显示在右键菜单中，但是按照程序使用的通用规则在此程序中仍会显示为启用，这是正常的现象。
+## 💕 謝辞
+* 原作者 [蓝点lilac（BluePointLilac）](https://github.com/BluePointLilac/ContextMenuManager)
+* 本家フォークの作者 [Jack251970](https://github.com/Jack251970/ContextMenuManager)
+* 新しいアイコンを制作した [澜芸](https://github.com/LanYun2022) と [KamilDev](https://github.com/KamilDev)
+* 日本語訳の元になった翻訳者 [夕綺Yuuki](https://github.com/JDYuuki) と [Jing](https://github.com/delgh1)
 
-* 每个右键管理程序禁用菜单方法可能不同，建议不要同时使用多个右键菜单管理程序。
+## 📄 ライセンス
+[LICENSE](LICENSE) を参照してください。
 
-* 大部分程序使用简单暴力的备份删除法，此程序尽可能使用了系统提供的键值进行隐藏以便于之后的恢复。
-
-* 通过其他程序禁用的菜单项目。请先使用对应程序还原，不然可能无法在此程序中看到它。
-
-* 此程序不用于清理未卸载干净的程序，但是可以帮助你快速定位菜单项相关注册表位置和文件位置，你可以根据相关内容进行你的操作。如果你是一个电脑小白，建议只使用启用/禁用功能。
-
-## 🏆 贡献者
-感谢我们的贡献者们！
-
-[![ContextMenuManager Contributors](https://contrib.rocks/image?repo=Jack251970/ContextMenuManager)](https://github.com/Jack251970/ContextMenuManager/graphs/contributors)
-
-由 [contrib.rocks](https://contrib.rocks) 生成。
-
-  [Latest]: https://github.com/Jack251970/ContextMenuManager/releases/latest
-  [GitHub Releases]: https://github.com/Jack251970/ContextMenuManager/releases
-  [Gitee Releases]: https://gitee.com/Jack251970/ContextMenuManager/releases
-  [.NET SDK]: https://dotnet.microsoft.com/zh-cn/download/dotnet/10.0
-
-## ❤️ 感谢
-
-要是你觉得这插件好用，就请我喝杯咖啡支持一下吧！
-
-[<img style="float:left" src="https://user-images.githubusercontent.com/14358394/115450238-f39e8100-a21b-11eb-89d0-fa4b82cdbce8.png" width="200">](https://ko-fi.com/jackye)
+  [.NET]: https://dotnet.microsoft.com/ja-jp/download/dotnet/10.0

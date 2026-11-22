@@ -147,6 +147,15 @@ namespace ContextMenuManager.Methods
                 {
                     var uiText = CultureInfo.CurrentUICulture.Name + "-Text";
                     TryGetValue(guid, uiText, out itemText);
+                    if (string.IsNullOrWhiteSpace(itemText) && !string.IsNullOrEmpty(AppConfig.Language))
+                    {
+                        TryGetValue(guid, AppConfig.Language + "-Text", out itemText);
+                    }
+                    // 中国語以外の UI では、その言語の訳が無ければ英語訳を使う
+                    if (string.IsNullOrWhiteSpace(itemText) && XmlDicHelper.UseEnglishFallback)
+                    {
+                        TryGetValue(guid, "en-US-Text", out itemText);
+                    }
                     if (string.IsNullOrWhiteSpace(itemText))
                     {
                         TryGetValue(guid, "Text", out itemText);

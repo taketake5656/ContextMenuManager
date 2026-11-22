@@ -42,6 +42,7 @@ namespace ContextMenuManager.Views
             HideSysStoreItemsCheckBox.IsOn = AppConfig.HideSysStoreItems;
             StripMenuMnemonicsCheckBox.IsOn = AppConfig.StripMenuMnemonics;
             DimInferredIconsCheckBox.IsOn = AppConfig.DimInferredIcons;
+            DetectPackagedMenusCheckBox.IsOn = AppConfig.DetectPackagedMenus;
 
             var showHideSysStore = WinOsVersion.Current >= WinOsVersion.Win7;
             HideSysStoreRow.Visibility = showHideSysStore ? Visibility.Visible : Visibility.Collapsed;
@@ -115,6 +116,8 @@ namespace ContextMenuManager.Views
             StripMenuMnemonicsLabel.Text = AppString.Other.StripMenuMnemonics;
 
             DimInferredIconsLabel.Text = AppString.Other.DimInferredIcons;
+
+            DetectPackagedMenusLabel.Text = AppString.Other.DetectPackagedMenus;
 
             LoadDynamicOptions();
         }
@@ -301,6 +304,15 @@ namespace ContextMenuManager.Views
             if (!isLoading)
             {
                 AppConfig.DimInferredIcons = DimInferredIconsCheckBox.IsOn;
+            }
+        }
+
+        private void DetectPackagedMenusCheckBox_OnChanged(object sender, RoutedEventArgs e)
+        {
+            if (!isLoading)
+            {
+                AppConfig.DetectPackagedMenus = DetectPackagedMenusCheckBox.IsOn;
+                PackagedContextMenuHelper.Reload();
             }
         }
 

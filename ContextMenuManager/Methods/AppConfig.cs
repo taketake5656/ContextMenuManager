@@ -320,6 +320,13 @@ namespace ContextMenuManager.Methods
             set => SetGeneralValue("DimInferredIcons", value ? 1 : 0);
         }
 
+        /// <summary>パッケージアプリ（Windows 11 の新しいメニュー）の項目を自動検出するか（既定: 有効）</summary>
+        public static bool DetectPackagedMenus
+        {
+            get => GetGeneralValue("DetectPackagedMenus") != "0";
+            set => SetGeneralValue("DetectPackagedMenus", value ? 1 : 0);
+        }
+
         public static bool RequestUseGithub
         {
             get
