@@ -12,13 +12,6 @@ namespace ContextMenuManager
         {
             // Check for logon restore command-line argument (silent background restore)
             var args = Environment.GetCommandLineArgs();
-
-            // パッケージアプリの右クリックメニュー項目の表示名を取得する子プロセス（UI なし）
-            if (args.Length > 3 && args[1].Equals(ExplorerCommandTitleProbe.ProbeArg, StringComparison.Ordinal))
-            {
-                ExplorerCommandTitleProbe.RunProbe(args[2], args[3], args.Length > 4 ? args[4] : null);
-                return;
-            }
             if (args.Length > 1 && args[1].Equals(LogonTaskHelper.LogonRestoreArg, StringComparison.OrdinalIgnoreCase))
             {
                 PerformLogonRestore();

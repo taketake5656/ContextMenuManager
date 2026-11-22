@@ -26,10 +26,6 @@ namespace ContextMenuManager.Methods
             public string PublisherDisplayName { get; init; } = string.Empty;
             public string IdentityName { get; init; } = string.Empty;
             public string VerbId { get; init; } = string.Empty;
-            /// <summary>実際に右クリックメニューに表示される名前（IExplorerCommand.GetTitle で取得）</summary>
-            public string Title { get; set; } = string.Empty;
-            /// <summary>この項目を実装している DLL のフルパス（分かる場合）</summary>
-            public string DllPath { get; init; } = string.Empty;
             /// <summary>マニフェストの ItemType（"*"、"Directory"、"Directory\Background"、".docx" など）</summary>
             public List<string> ItemTypes { get; } = new();
         }
@@ -116,139 +112,8 @@ namespace ContextMenuManager.Methods
             catch
             {
             }
-            var entries = result.Values.ToList();
-            try
-            {
-                ResolveTitles(entries);
-            }
-            catch
-            {
-            }
-            return entries;
+            return result.Values.ToList();
         }
-
-        #region 実際の表示名の取得
-
-        private static string TitleCachePath => Path.Combine(AppConfig.ConfigDir, "PackagedMenuTitles.v3.txt");
-
-        /// <summary>表示名の取得ログ（うまく取れないときの調査用）</summary>
-        public static string TitleLogPath => Path.Combine(AppConfig.ConfigDir, "PackagedMenuTitles.log");
-
-        /// <summary>
-        /// 実際の右クリックメニューの表示名を取得する。
-        /// 結果はパッケージのフルネーム（バージョンを含む）ごとに保存し、アプリが更新されたときだけ取り直す。
-        /// </summary>
-        private static void ResolveTitles(List<Entry> entries)
-        {
-            var cache = LoadTitleCache();
-            var requests = new List<(Guid Guid, string ItemPath, string DllPath)>();
-            foreach (var entry in entries)
-            {
-                if (cache.TryGetValue(CacheKey(entry), out var cached))
-                {
-                    entry.Title = cached;
-                }
-                else
-                {
-                    requests.Add((entry.Guid, GetProbeItemPath(entry), entry.DllPath));
-                }
-            }
-            if (requests.Count == 0) return;
-
-            var titles = ExplorerCommandTitleProbe.Query(requests, TitleLogPath);
-            foreach (var entry in entries)
-            {
-                var key = CacheKey(entry);
-                if (cache.ContainsKey(key)) continue;
-                entry.Title = titles.TryGetValue(entry.Guid, out var title) ? title : string.Empty;
-                // 取得できなかった場合も空で保存し、毎回の起動で取り直さないようにする
-                cache[key] = entry.Title;
-            }
-            SaveTitleCache(cache, entries);
-            try
-            {
-                // ログの CLSID がどのアプリの項目か分かるように対応表を付ける
-                var map = entries.Where(e => requests.Any(r => r.Guid == e.Guid))
-                    .Select(e => $"{e.Guid:B} = {e.IdentityName} ({e.VerbId})");
-                File.AppendAllLines(TitleLogPath, new[] { "# CLSID とパッケージの対応" }.Concat(map), System.Text.Encoding.UTF8);
-            }
-            catch
-            {
-            }
-        }
-
-        /// <summary>保存済みの表示名を破棄する（次回の検出で取り直す）。</summary>
-        public static void ClearTitleCache()
-        {
-            try { File.Delete(TitleCachePath); } catch { }
-            Reload();
-        }
-
-        private static string CacheKey(Entry entry) => $"{entry.PackageFullName}|{entry.Guid:B}";
-
-        private static Dictionary<string, string> LoadTitleCache()
-        {
-            var cache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            try
-            {
-                if (!File.Exists(TitleCachePath)) return cache;
-                foreach (var line in File.ReadAllLines(TitleCachePath, System.Text.Encoding.UTF8))
-                {
-                    var i = line.IndexOf('\t');
-                    if (i <= 0) continue;
-                    cache[line[..i]] = line[(i + 1)..];
-                }
-            }
-            catch
-            {
-            }
-            return cache;
-        }
-
-        private static void SaveTitleCache(Dictionary<string, string> cache, List<Entry> entries)
-        {
-            try
-            {
-                // 現在インストールされているパッケージの分だけ残す（古いバージョンの分は捨てる）
-                var keys = new HashSet<string>(entries.Select(CacheKey), StringComparer.OrdinalIgnoreCase);
-                var lines = cache.Where(kv => keys.Contains(kv.Key)).Select(kv => $"{kv.Key}\t{kv.Value}");
-                File.WriteAllLines(TitleCachePath, lines, new System.Text.UTF8Encoding(true));
-            }
-            catch
-            {
-            }
-        }
-
-        /// <summary>GetTitle に渡す「選択中の項目」として使うファイルやフォルダーを用意する。</summary>
-        private static string GetProbeItemPath(Entry entry)
-        {
-            try
-            {
-                var dir = Path.Combine(Path.GetTempPath(), "ContextMenuManager_probe");
-                Directory.CreateDirectory(dir);
-                var type = entry.ItemTypes.FirstOrDefault(t => t == "*")
-                    ?? entry.ItemTypes.FirstOrDefault(t => t.StartsWith("."))
-                    ?? entry.ItemTypes.FirstOrDefault() ?? "*";
-                if (type == "*" || type.StartsWith("."))
-                {
-                    var ext = type == "*" ? ".txt" : type;
-                    var file = Path.Combine(dir, "probe" + ext);
-                    if (!File.Exists(file)) File.WriteAllBytes(file, Array.Empty<byte>());
-                    return file;
-                }
-                if (Eq(type, "Drive")) return Path.GetPathRoot(Environment.SystemDirectory);
-                // Directory、Directory\Background、Folder など
-                var folder = Path.Combine(dir, "probe_folder");
-                Directory.CreateDirectory(folder);
-                return folder;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        #endregion
 
         private static void ScanPackage(string fullName, Dictionary<Guid, Entry> result)
         {
@@ -288,50 +153,12 @@ namespace ContextMenuManager.Methods
                             PublisherDisplayName = publisherName,
                             IdentityName = identityName,
                             VerbId = verbXE.GetAttribute("Id"),
-                            DllPath = FindDllPath(fullName, guid, Path.GetDirectoryName(manifestPath)),
                         };
                         result.Add(guid, entry);
                     }
                     if (!entry.ItemTypes.Contains(type, StringComparer.OrdinalIgnoreCase)) entry.ItemTypes.Add(type);
                 }
             }
-        }
-
-        /// <summary>
-        /// HKCR\PackagedCom\Package\[パッケージ]\Class\[CLSID] の DllPath から、DLL のフルパスを求める。
-        /// DllPath はパッケージのフォルダー（スパースパッケージでは外部の場所）からの相対パス。
-        /// </summary>
-        private static string FindDllPath(string fullName, Guid guid, string manifestDir)
-        {
-            try
-            {
-                using var classKey = Registry.ClassesRoot.OpenSubKey($@"{PackagedComPath}\{fullName}\Class\{guid:B}");
-                var dll = classKey?.GetValue("DllPath")?.ToString();
-                if (string.IsNullOrEmpty(dll)) return string.Empty;
-                dll = Environment.ExpandEnvironmentVariables(dll);
-                if (Path.IsPathRooted(dll)) return File.Exists(dll) ? dll : string.Empty;
-
-                var bases = new List<string>();
-                using (var repoKey = Registry.ClassesRoot.OpenSubKey($@"{PackageRepositoryPath}\{fullName}"))
-                {
-                    foreach (var name in new[] { "Path", "PackageRootFolder", "ExternalLocation", "EffectiveLocation" })
-                    {
-                        var v = repoKey?.GetValue(name)?.ToString();
-                        if (!string.IsNullOrEmpty(v)) bases.Add(v);
-                    }
-                }
-                if (!string.IsNullOrEmpty(manifestDir)) bases.Add(manifestDir);
-                bases.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "WindowsApps", fullName));
-                foreach (var b in bases)
-                {
-                    var candidate = Path.Combine(b, dll);
-                    if (File.Exists(candidate)) return candidate;
-                }
-            }
-            catch
-            {
-            }
-            return string.Empty;
         }
 
         /// <summary>パッケージの AppxManifest.xml の場所を探す。</summary>
@@ -407,9 +234,7 @@ namespace ContextMenuManager.Methods
         /// <summary>一覧に表示する名前を作る。</summary>
         public static string GetItemText(Entry entry)
         {
-            // 実際の右クリックメニューの表示名が取れていれば、それを最優先で使う
-            var text = entry.Title;
-            if (string.IsNullOrWhiteSpace(text)) text = GuidInfo.GetText(entry.Guid);
+            var text = GuidInfo.GetText(entry.Guid);
             if (string.IsNullOrWhiteSpace(text))
             {
                 text = entry.DisplayName;
